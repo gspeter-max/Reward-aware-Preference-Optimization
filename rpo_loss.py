@@ -1,5 +1,5 @@
 import torch 
-
+from GL_probility import G
 class rpo_loss_func:
         def __init__( self, ref_model , policy_model , beta, distance_matrix ):
         self.ref_model = ref_model 
