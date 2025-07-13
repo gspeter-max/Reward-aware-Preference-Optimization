@@ -1,20 +1,38 @@
 import torch 
 from GL_probility import G
 class rpo_loss_func:
-        def __init__( self, ref_model , policy_model , beta, distance_matrix ):
+    def __init__( self, ref_model , policy_model , beta, distance_matrix ,reward_scaling ):
         self.ref_model = ref_model 
         self.policy_model = policy_model 
         self.beta = beta 
         self.D = distance_matrix 
+        self.reward_scaling = reward_scaling 
     
-    def backward_kl( self,y,x):
+    def backward_kl( self,y_k,x, reward_k_response: list ):
         '''
         first we are need to compute π(yk∣x) likehood of the model to generate a prompt 
         that is done by computing the sum of all the token probability that have in respone 
         '''
 
-        model_respone_likelihood = 
-        exp_response_term = torch.exp( self.beta * torch.log(
+        raw_reward_prob = self.reward_scaling * reward_k_response
+        raw_policy_likelihood = get_model_prob.compute_prob(
+                self.policy_model, 
+                x, 
+                y_k
+            )
+        raw_ref_model_likelihood = get_model_prob.compute_prob(
+                self.ref_model, 
+                x, 
+                y_k 
+            ) 
+        raw_models_prob = [ self.beta * torch.log( rpm / rfm ) 
+                for rpm , rfm in zip( raw_policy_likelihood , raw_ref_model_likelihood ) 
+                ]
+        model_reward_prob = torch.nn.functional.softmax( raw_models_prob, dim = -1 ) 
+        reward_model_prob = torch.nn.functional.softmax( raw_reward_prob, dim = -1 )
+        
+        loss = [rmp * torch.log( rmp / mrp ) for rmp, mrp in zip( reward_model_prob, model_reward_prob)]
+        return torch.sum( loss, dim = -1)
 
     def __call__(self , 
 
