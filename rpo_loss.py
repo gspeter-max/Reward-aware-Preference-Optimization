@@ -49,39 +49,35 @@ class rpo_loss_func:
         first we are need to compute π(yk∣x) likehood of the model to generate a prompt 
         that is done by computing the sum of all the token probability that have in respone 
         '''
-        #if not isinstance( reward_k_response, torch.Tensor ):
-            #            reward_k_response = torch.tensor(reward_k_response)
-
+        
         raw_reward_prob = self.reward_scaling * reward_k_response
         raw_policy_likelihood = get_model_prob.compute_prob(
                 self.policy_model, 
                 x, 
                 y_k
             )
+
         raw_ref_model_likelihood = get_model_prob.compute_prob(
                 self.ref_model, 
                 x, 
                 y_k 
             ) 
-#        raw_models_prob = torch.tensor([ self.beta * torch.log( rpm / rfm ) 
-                                        #                for rpm , rfm in zip( raw_policy_likelihood , raw_ref_model_likelihood ) 
-                                        #       ]) 
+        
+
         raw_models_prob = self.beta * torch.log( raw_policy_likelihood / rew_ref_model_likelihood )
         model_reward_prob = torch.nn.functional.softmax( raw_models_prob, dim = -1 )
         reward_model_prob = torch.nn.functional.softmax( raw_reward_prob, dim = -1 )
         
-#        loss = torch.tensor([rmp * torch.log( rmp / mrp ) for rmp, mrp in zip( reward_model_prob, model_reward_prob)]) 
         loss = reward_model_prob * torch.log( reward_model_prob/ model_reward_prob ) 
         return torch.sum( loss, dim = -1)
 
 loss_func = rpo_loss_func()
 
-x = 'hi i am genius i am extremly creative? '
+x = 'hi i am genius i am extremly creative , and you ? '
 y = ['yeah i am ', 'i think yes']
 z = torch.tensor([0.234,0.43]) 
 
 loss_func.backward_kl( y, x, z)
-
-    # def __call__(self ,
-# from GL_probility import G
+''' for backward ''' 
+loss.backward() 
 

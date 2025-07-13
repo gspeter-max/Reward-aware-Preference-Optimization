@@ -23,6 +23,10 @@ class Generate_Response_Prob:
                 prompt = prompt + self.tokenizer.decode( tokenized_ids )
             log_prob_list.append( log_prob ) 
         
-        return torch.tensor( log_prob_list ) 
+        return torch.tensor(
+                log_prob_list, 
+                requires_grad = True 
+                )
+
 
 
