@@ -61,7 +61,8 @@ class Generate_Response_Prob:
         for i in range( self.num_responses ):
 
             attention_tracking = torch.tensor([
-                    (i,self.tokenizer(prompt[i], return_tensors = 'pt').input_ids.shape[-1]) for i in range(self.batched_response)
+                    (i,self.tokenizer(prompt[i], return_tensors = 'pt').input_ids.shape[-1]) 
+                    for i in range(self.batched_response)
                     ])
 
             generated_response = generated_response_k[i : i+1 ]
