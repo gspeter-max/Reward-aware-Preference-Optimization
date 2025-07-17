@@ -35,87 +35,40 @@ model = AutoModelForCausalLM.from_pretrained(
 #     output_all_columns = True
 # )
 
-class Generate_Response_Prob:
-    def __init__(
-            self,
-            tokenizer,
-            num_responses_for_one_prompt= 2,
-            batched_response = 1
-            ):
-        self.tokenizer = tokenizer
-        self.num_responses = num_responses_for_one_prompt
-        self.batched_response = batched_response
+def compute_score( seq ,model_name = None , model = None ,tokenizer = None, for_each_token = False):
+     
+    if torch.cuda.is_available():
+        device= 'cuda' 
+    else: 
+        device = 'cpu' 
 
+    if model is None :
+        model = AutoModelForCausalLM.from_pretrained( model_name ).to(device) 
 
-    def compute_prob( self,model, prompt, generated_response_k ):
-        log_prob_list = []
-        log_prob = 0
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained( model_name ) 
+    
+    model_input = tokenizer( seq , return_tensors = 'pt' ).to(device) 
+    with torch.no_grad():
+        output = model( **model_input )  
+        logits = output.logits
+    '''
+    logits --> ( Batch , SeqLen , Vocab_size ) 
+    log_softmax ----> ( Batch, SeqLen , Vocab_size ) 
 
-        prompt_tokenized = self.tokenizer(
-                prompt,
-                return_tensors = 'pt',
-                truncation = True ,
-                padding = 'max_length'
-                ).to('cuda')
+    '''
 
-        for i in range( self.num_responses ):
+    log_softmax = torch.nn.functional.log_softmax(logits, dim = -1 ) 
+    
+    seq_scores = []
+    for input_id in range(len(model_input['input_ids'])):
+        seq_scores.append( log_softmax[:, input_id - 1 , input_id f] )
 
-            attention_tracking = torch.tensor([
-                    (i,self.tokenizer(prompt[i], return_tensors = 'pt').input_ids.shape[-1]) 
-                    for i in range(self.batched_response)
-                    ])
-
-            generated_response = generated_response_k[i : i+1 ]
-            response_tokenized = self.tokenizer(
-                    generated_response,
-                    return_tensors = 'pt',
-                    truncation = True,
-                    padding = 'max_length'
-                            ).to('cuda')
-
-
-            response_tokenized = response_tokenized.input_ids
-
-            # if len(response_tokenized.shape) < 3:
-            #     print(len(response_tokenized.shape))
-            #     response_tokenized = response_tokenized.unsqueeze(0)
-
-
-            for j in range( self.tokenizer.max_len_single_sentence):
-
-                #if len(prompt_tokenized.input_ids.shape) < 3:
-                    #                   print(len(prompt_tokenized.input_ids.shape))
-#                    prompt_tokenized.input_ids = prompt_tokenized.input_ids.unsqueeze(0)
-                print(j)
-                att_trac_row, att_trac_col = zip(*attention_tracking)
-                prompt_tokenized.attention_mask[att_trac_row, att_trac_col] = torch.tensor(1) # here the main logic
-                model_output = model( **prompt_tokenized ).logits
-
-
-                soft_max_model_output = torch.nn.functional.softmax(model_output[:,-1,:], dim = -1)
-                log_prob = log_prob + torch.log(soft_max_model_output[ :,response_tokenized[:, j ]] )
-
-                prompt_tokenized.input_ids[att_trac_row ,att_trac_col] = response_tokenized[:,j]
-
-                attention_tracking = attention_tracking + 1
-
-                att_trac_row , att_trac_col = zip( *attention_tracking )
-                att_trac_row = torch.tensor(att_trac_row ) - 1 
-                attention_tracking = torch.tensor(
-                        list(
-                            zip(
-                                att_trac_row, torch.tensor(att_trac_col) 
-                                )
-                            ) 
-                        )
-                                                
-            print(f'thing one ')
-            log_prob_list.append( log_prob )
-
-        return torch.tensor(
-                log_prob_list,
-                requires_grad = True
-                )   
+    seq_scores = torch.stack(seq_scores, dim = 0)
+    if for_each_token :
+        return seq_scores 
+    
+    return torch.sum(seq_scores) 
 
 
 get_model_prob = Generate_Response_Prob( tokenizer )
@@ -134,19 +87,8 @@ class rpo_loss_func:
         '''
 
         raw_reward_prob = self.reward_scaling * reward_k_response
-        raw_policy_likelihood = get_model_prob.compute_prob(
-                self.policy_model,
-                x,
-                y_k
-            )
 
-        raw_ref_model_likelihood = get_model_prob.compute_prob(
-
-                self.ref_model,
-                x,
-                y_k
-            )
-
+            
 
         raw_models_prob = self.beta * torch.log( raw_policy_likelihood / raw_ref_model_likelihood )
         model_reward_prob = torch.nn.functional.softmax( raw_models_prob, dim = -1 )

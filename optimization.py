@@ -16,7 +16,7 @@ class Reward_Model(nn.Module):
         return self.final_layer(hidden_state ) 
 
 reward_model = Reward_Model( model = model, model_output_shape = model.config.vocab_size )
-
+'''
 dataset = load_dataset('Amod/mental_health_counseling_conversations') 
 def map_tokenizer(example):
      return tokenizer(
@@ -34,7 +34,7 @@ dataset.set_format(
      columns = ['input_ids','attention_mask', 'labels'],
      output_all_columns = True
  )
-
+'''
 torch_dataset = DataLoader(
         dataset, 
         batch_size = 40
