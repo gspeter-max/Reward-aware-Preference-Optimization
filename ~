@@ -72,3 +72,4 @@ tokenizer.pad_token = tokenizer.eos_token
 tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
 
 data = get_data(tokenizer = tokenizer)
+print(data()) 
