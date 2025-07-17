@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.quantization_config import BitsAndBytesConfig
 from tqdm import tqdm
-# from dataset import get_data
+from dataset import get_data
 import numpy as np
 import math
 
