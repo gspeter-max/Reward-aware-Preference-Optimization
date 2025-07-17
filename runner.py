@@ -18,46 +18,23 @@ model = AutoModelForCausalLM.from_pretrained(
     quantization_config=quantization_config
 
     )
-
-# dataset = load_dataset('Amod/mental_health_counseling_conversations')
-# def map_tokenizer(example):
-#     return tokenizer(
-#         text = example['Context'],
-#         text_target = example['Response'],
-#         padding = 'max_length',
-#         truncation = True,
-#         return_tensors = 'pt'
-#     ).to('cuda')
-# dataset = dataset['train'].map(map_tokenizer, batched=True, remove_columns = dataset['train'].column_names)
-# dataset.set_format(
-#     type = 'torch',
-#     columns = ['input_ids','attention_mask', 'labels'],
-#     output_all_columns = True
-# )
-
 def compute_score( seq ,model_name = None , model = None ,tokenizer = None, for_each_token = False):
      
-    if torch.cuda.is_available():
-        device= 'cuda' 
-    else: 
-        device = 'cpu' 
-
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if model is None :
         model = AutoModelForCausalLM.from_pretrained( model_name ).to(device) 
-
-    if tokenizer is None:
-        tokenizer = AutoTokenizer.from_pretrained( model_name ) 
     
-    model_input = tokenizer( seq , return_tensors = 'pt' ).to(device) 
+    model_input = next(iter(model_input)) 
+
     with torch.no_grad():
         output = model( **model_input )  
         logits = output.logits
+    
     '''
     logits --> ( Batch , SeqLen , Vocab_size ) 
     log_softmax ----> ( Batch, SeqLen , Vocab_size ) 
 
     '''
-
     log_softmax = torch.nn.functional.log_softmax(logits, dim = -1 ) 
     
     seq_scores = []

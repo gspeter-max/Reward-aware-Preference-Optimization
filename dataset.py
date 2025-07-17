@@ -64,7 +64,7 @@ class get_data:
                 device = 'cuda' if torch.cuda.is_available() else 'cpu' 
                 )
         if self.return_dataloader: 
-            dataset = DataLoader( dataset ) 
+            dataset = DataLoader( dataset , batch_size = len(dataset))  
         
         return dataset
 
