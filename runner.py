@@ -18,34 +18,36 @@ model = AutoModelForCausalLM.from_pretrained(
     quantization_config=quantization_config
 
     )
-def compute_score( seq ,model_name = None , model = None ,tokenizer = None, for_each_token = False):
-     
+
+import torch
+def compute_score( model_input : dict ,model_name = None , model = None ,tokenizer = None, for_each_token = False):
+    from transformers import AutoModelForCausalLM
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     if model is None :
-        model = AutoModelForCausalLM.from_pretrained( model_name ).to(device) 
-    
-    model_input = next(iter(model_input)) 
+        model = AutoModelForCausalLM.from_pretrained( model_name ).to(device)
+    model_input = next(iter(model_input))
 
     with torch.no_grad():
-        output = model( **model_input )  
+        output = model( **model_input )
         logits = output.logits
-    
     '''
-    logits --> ( Batch , SeqLen , Vocab_size ) 
-    log_softmax ----> ( Batch, SeqLen , Vocab_size ) 
+    logits --> ( Batch , SeqLen , Vocab_size )
+    log_softmax ----> ( Batch, SeqLen , Vocab_size )
 
     '''
-    log_softmax = torch.nn.functional.log_softmax(logits, dim = -1 ) 
-    
+
+    log_softmax = torch.nn.functional.log_softmax(logits, dim = -1 )
     seq_scores = []
     for input_id in range(len(model_input['input_ids'])):
-        seq_scores.append( log_softmax[:, input_id - 1 , input_id f] )
+        seq_scores.append( log_softmax[:, input_id - 1 , input_id ] )
 
-    seq_scores = torch.stack(seq_scores, dim = 0)
     if for_each_token :
-        return seq_scores 
-    
-    return torch.sum(seq_scores) 
+        return torch.tensor(seq_scores)
+    return torch.sum(torch.stack(seq_scores, dim = 0))
+
+print(compute_score(model_input=dataset, model_name='gpt2'))
 
 
 get_model_prob = Generate_Response_Prob( tokenizer )

@@ -1,21 +1,21 @@
-from datasets import Dataset 
-from torch.utils.data import DataLoader 
+import torch 
 
-class get_data: 
-     
+from datasets import Dataset
+from torch.utils.data import DataLoader
+
+class get_data:
+
     def __init__(
-            self, 
-            tokenizer, 
-            return_dataloader
+            self,
+            tokenizer
             ):
         self.tokenizer = tokenizer
-        slef.return_dataloader = return_dataloader 
 
-    def __call__(self): 
+    def __call__(self):
         from datasets import Dataset
         dict_ = {
             "prompt": [
-                "What are the benefits of AI in healthcare?", 
+                "What are the benefits of AI in healthcare?",
                 "Explain the concept of overfitting in machine learning.",
                 "What causes inflation in an economy?"
                 ],
@@ -36,9 +36,9 @@ class get_data:
                 "Printing too much money leads to currency devaluation.",
                 "Supply chain disruptions can increase production costs.",
                 "Wage hikes without productivity gains may fuel inflation."
+                ]
             ]
-        ]
-    }
+        }
         dataset = Dataset.from_dict(dict_)
         def map_function(example):
             temp_list = []
@@ -52,26 +52,25 @@ class get_data:
         def map_tokenizer(example):
             return self.tokenizer(
                 text = example['final_combination'],
-                truncation = True, 
-                padding = 'max_length', 
+                truncation = True,
+                padding = 'max_length',
                 return_tensors = 'pt'
                 )
 
-        dataset = dataset.map( map_tokenizer)
-
+        dataset = dataset.map( map_tokenizer )
         dataset.set_format(
-                type = 'torch', 
-                device = 'cuda' if torch.cuda.is_available() else 'cpu' 
+                type = 'torch',
+                device = 'cuda' if torch.cuda.is_available() else 'cpu'
                 )
-        if self.return_dataloader: 
-            dataset = DataLoader( dataset , batch_size = len(dataset))  
-        
+        dataset = dataset.select_columns(['input_ids','attention_mask'])
+        dataset = DataLoader(dataset, batch_size = len(dataset))
         return dataset
 
 from transformers import  AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained('google-bert/bert-base-uncased')
-tokenizer.pad_token = tokenizer.eos_token 
-tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
 data = get_data(tokenizer = tokenizer)
+dataset= data()
