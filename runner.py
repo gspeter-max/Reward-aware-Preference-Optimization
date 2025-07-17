@@ -104,9 +104,6 @@ class rpo_loss_func:
 
 
 loss_func = rpo_loss_func()
-
-x = ['hi i am genius i am extremly creative , and you ?']
-y = ['yeah i am ', 'i think yes']
 z = torch.tensor([
         [0.423,0.234,0.2342,0.234],
         [0.234,0.2342,0.2342,0.23412],
