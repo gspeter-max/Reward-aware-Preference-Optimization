@@ -5,9 +5,11 @@ class get_data:
      
     def __init__(
             self, 
-            tokenizer
+            tokenizer, 
+            return_dataloader
             ):
-        self.tokenizer = tokenizer 
+        self.tokenizer = tokenizer
+        slef.return_dataloader = return_dataloader 
 
     def __call__(self): 
         from datasets import Dataset
@@ -61,7 +63,8 @@ class get_data:
                 type = 'torch', 
                 device = 'cuda' if torch.cuda.is_available() else 'cpu' 
                 )
-        dataset = DataLoader( dataset ) 
+        if self.return_dataloader: 
+            dataset = DataLoader( dataset ) 
         
         return dataset
 
