@@ -45,45 +45,29 @@ reward_model = Reward_Model( model = model, model_output_shape = model.config.vo
 # result = reward_model(tokenized)
 # print(reward_model.hidden) 
 
-data = load_dataset('allenai/reward-bench')['filtered']
-data = data.remove_columns(['chosen_model','rejected_model','subset','id'])
+data = load_dataset('Anthropic/hh-rlhf')['test'] 
 
-data = data.to_pandas().astype(str).values.tolist() 
-tokenized_data = tokenizer(data, truncation= True, padding = 'max_length', return_tensors = 'pt')
+batch_size = 300
+if tokenized_data.input_ids.shape[0] % 3 != 0: 
+    RuntimeError('batch size is not correct') 
 
-prompt = [] 
-chosen = [] 
-rejected = [] 
+data = data.to_pandas().astype(str).values.flatten().tolist()
+tokenized_data = tokenizer(data, truncation= True, padding = 'max_length', return_tensors = 'pt').to('cuda')
+dataset = TensorDataset(tokenized_data.input_ids,tokenized_data.attention_mask)
 
-for i in range(int(tokenized_data.input_ids.shape[0]/3)):
-    prompt.append((tokenized_data.input_ids[i*3,:],tokenized_data.attention_mask[i*3,:])) 
-    chosen.append((tokenized_data.input_ids[i*3+1,:], tokenized_data.attention_mask[i*3+1,:])) 
-    rejected.append((tokenized_data.input_ids[i*3+2,:], tokenized_data.attention_mask[i*3+2,:])) 
-
-prompt = np.array(prompt) 
-chosen = np.array(chosen) 
-rejected = np.array(rejected) 
-
-tensordata = TensorData(prompt,chosen, rejected)
-
-dataset = DataLoader(tensordata , batch_size = 10)
-dataset = next(iter(dataset))
-result = reward_model(dataset)
-
+data = DataLoader(dataset, batch_size = batch_size)
 optim = torch.optim.Adam( reward_model.Parameters() , lr = 0.00234 )
-'''
 
-i think we are not need prompt and we are definately work with list(tuple(str ,str) ) i think you get it 
-do that 
-
-and completely  run that and make this more pretiyer 
-'''
-
-loss_func = reward_loss( reward_model)
-for train_data in torch_dataset:
-    prompt , chosen, rejected = train_data 
-    loss = loss_func( chosen , rejected )   
+for index, batched_data in enumerate(dataset):
+    reward_scores = reward_model(
+            input_ids = batched_data[0], 
+            attention_mask= batched_data[1]
+            ) 
+    y1 = reward_scores[0::2]
+    y2 = reward_scores[1::2]
+    x = y1 - y2
+    loss = -torch.nn.functional.log_sigmoid(x) 
+    loss.backward()
     optim.step()
-    optim_zero_grad()
-    break
+    optim.zero_grad()
 
