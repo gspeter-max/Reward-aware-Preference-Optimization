@@ -71,6 +71,13 @@ dataset = next(iter(dataset))
 result = reward_model(dataset)
 
 optim = torch.optim.Adam( reward_model.Parameters() , lr = 0.00234 )
+'''
+
+i think we are not need prompt and we are definately work with list(tuple(str ,str) ) i think you get it 
+do that 
+
+and completely  run that and make this more pretiyer 
+'''
 
 loss_func = reward_loss( reward_model)
 for train_data in torch_dataset:
