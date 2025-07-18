@@ -24,27 +24,7 @@ class Reward_Model(nn.Module):
         self.hidden = hidden_state 
         return self.final_layer(hidden_state ) 
 
-class reward_loss:
-    def __init_( self, model):
-        self.model = model 
-
-    def __call__( self, y2, y1):
-        y2_reward = model(y2) 
-        y1_reward = model(y1) 
-
-        x = y1 - y2 
-        return torch.nn.functional.log_sigmoid(x)
-
 reward_model = Reward_Model( model = model, model_output_shape = model.config.vocab_size ).to('cuda')
-# tokenized = tokenizer(
-#          text = ['hi i am a genius', 'oki doki '] , 
-#          padding = 'max_length',
-#          truncation = True,
-#          return_tensors = 'pt'
-#      ).to('cuda')
-# result = reward_model(tokenized)
-# print(reward_model.hidden) 
-
 data = load_dataset('Anthropic/hh-rlhf')['test'] 
 
 batch_size = 300
