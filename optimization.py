@@ -5,12 +5,12 @@ import torch
 from datasets import load_dataset
 
 
-
 model = AutoModelForCausalLM.from_pretrained(
        'gpt2' 
         )
 tokenizer = AutoTokenizer.from_pretrained('gpt2')
 tokenizer.pad_token = tokenizer.eos_token 
+
 
 class Reward_Model(nn.Module): 
     def __init__(self, model: nn.Module , model_output_shape = model.config.vocab_size ):
@@ -24,6 +24,16 @@ class Reward_Model(nn.Module):
         self.hidden = hidden_state 
         return self.final_layer(hidden_state ) 
 
+class reward_loss:
+    def __init_( self, model):
+        self.model = model 
+
+    def __call__( self, y2, y1):
+        y2_reward = model(y2) 
+        y1_reward = model(y1) 
+
+        x = y1 - y2 
+        return torch.nn.functional.log_sigmoid(x)
 
 reward_model = Reward_Model( model = model, model_output_shape = model.config.vocab_size ).to('cuda')
 # tokenized = tokenizer(
@@ -52,24 +62,17 @@ dataset.set_format(
     device = 'cuda'
 )
 
-dataset = DataLoader(dataset, batch_size = len(dataset))
+dataset = DataLoader(dataset, batch_size = 10)
 dataset = next(iter(dataset))
-print(dataset)
-# result = reward_model(dataset)
-# print(result)
+result = reward_model(dataset)
 
-# optim = torch.optim.Adam( model.Parameters() , lr = 0.00234 )
-# ''' you must be pass models over here '''
+optim = torch.optim.Adam( reward_model.Parameters() , lr = 0.00234 )
+''' you must be pass models over here '''
 
-# loss_func = rpo_loss_func()  
-# for train_data in torch_dataset:
-#     loss = loss_func.backward_kl( 
-#                 train_data['Context'],
-#                 train_data['Response'],
-#                 reward_model(train_data['Response'] ) 
-#                 )
-#     loss.backward() 
-#     optim.step() 
-#     optim_zero_grad() 
-
+loss_func = reward_loss( reward_model) 
+for train_data in torch_dataset:
+    loss = loss_func( y1_data , y2_data ) 
+    optim.step() 
+    optim_zero_grad()
+    break
 
