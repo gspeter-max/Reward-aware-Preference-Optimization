@@ -1,9 +1,9 @@
 from transformers import AutoModelForCausalLM  ,AutoTokenizer 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorData
 import torch.nn as nn
 import torch
 from datasets import load_dataset
-
+import numpy as np
 
 model = AutoModelForCausalLM.from_pretrained(
        'gpt2' 
@@ -45,34 +45,38 @@ reward_model = Reward_Model( model = model, model_output_shape = model.config.vo
 # result = reward_model(tokenized)
 # print(reward_model.hidden) 
 
+data = load_dataset('allenai/reward-bench')['filtered']
+data = data.remove_columns(['chosen_model','rejected_model','subset','id'])
 
-dataset = load_dataset('Amod/mental_health_counseling_conversations',split='train')
-def map_function(example):
-    combine_features = [f'{context} [SEP] {response}' for context, response in zip(example['Context'], example['Response'])] 
-    tokenized = tokenizer(
-        text = combine_features, 
-        truncation = True, 
-        padding = 'max_length'
-    )
-    return tokenized 
+data = data.to_pandas().astype(str).values.tolist() 
+tokenized_data = tokenizer(data, truncation= True, padding = 'max_length', return_tensors = 'pt')
 
-dataset  = dataset.map( map_function , batched = True , remove_columns= dataset.column_names)
-dataset.set_format(
-    type = 'torch', 
-    device = 'cuda'
-)
+prompt = [] 
+chosen = [] 
+rejected = [] 
 
-dataset = DataLoader(dataset, batch_size = 10)
+for i in range(int(tokenized_data.input_ids.shape[0]/3)):
+    prompt.append((tokenized_data.input_ids[i*3,:],tokenized_data.attention_mask[i*3,:])) 
+    chosen.append((tokenized_data.input_ids[i*3+1,:], tokenized_data.attention_mask[i*3+1,:])) 
+    rejected.append((tokenized_data.input_ids[i*3+2,:], tokenized_data.attention_mask[i*3+2,:])) 
+
+prompt = np.array(prompt) 
+chosen = np.array(chosen) 
+rejected = np.array(rejected) 
+
+tensordata = TensorData(prompt,chosen, rejected)
+
+dataset = DataLoader(tensordata , batch_size = 10)
 dataset = next(iter(dataset))
 result = reward_model(dataset)
 
 optim = torch.optim.Adam( reward_model.Parameters() , lr = 0.00234 )
-''' you must be pass models over here '''
 
-loss_func = reward_loss( reward_model) 
+loss_func = reward_loss( reward_model)
 for train_data in torch_dataset:
-    loss = loss_func( y1_data , y2_data ) 
-    optim.step() 
+    prompt , chosen, rejected = train_data 
+    loss = loss_func( chosen , rejected )   
+    optim.step()
     optim_zero_grad()
     break
 
