@@ -49,7 +49,8 @@ class get_data:
         dataset = dataset.map( map_tokenizer )
         dataset.set_format(
                 type = 'torch',
-                device = 'cuda'
+                device = 'cuda', 
+                
                 )
         dataset = DataLoader(dataset, batch_size = len(dataset))
         return dataset
@@ -60,4 +61,5 @@ class get_data:
 # tokenizer.pad_token = tokenizer.eos_token
 # data = get_data(tokenizer = tokenizer)
 # dataset= data()
+
 

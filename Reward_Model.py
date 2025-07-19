@@ -5,9 +5,6 @@ import torch
 from datasets import load_dataset
 import numpy as np
 
-pre_model = AutoModelForCausalLM.from_pretrained('gpt2')
-tokenizer = AutoTokenizer.from_pretrained('gpt2')
-tokenizer.pad_token = tokenizer.eos_token
 
 
 class Reward_Model(nn.Module):
@@ -24,7 +21,6 @@ class Reward_Model(nn.Module):
         self.hidden = None
 
     def forward(self, x, for_eval = False):
-
         if for_eval:
             hidden_state = self.model(
                 input_ids= x['input_ids'],
@@ -41,6 +37,11 @@ class Reward_Model(nn.Module):
 
 ''' for training reward model ''' 
 print(f'reward model trianing start') 
+
+pre_model = AutoModelForCausalLM.from_pretrained('gpt2')
+tokenizer = AutoTokenizer.from_pretrained('gpt2')
+tokenizer.pad_token = tokenizer.eos_token
+
 reward_model = Reward_Model( model = pre_model, model_output_shape = pre_model .config.vocab_size ).to('cuda')
 data = load_dataset('Anthropic/hh-rlhf')['test']
 
@@ -71,3 +72,4 @@ for index, batched_data in enumerate(data):
     optim.step()
     optim.zero_grad()
     print(f'loss is : {loss}')
+
