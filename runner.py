@@ -2,17 +2,18 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.quantization_config import BitsAndBytesConfig
 from tqdm import tqdm
-from dataset import get_data
+# from Reward_Model import Reward_Model
+# from dataset import get_data
 import numpy as np
 import math
 
 
-quantization_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_compute_dtype=torch.float16,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_use_double_quant=True
-)
+# quantization_config = BitsAndBytesConfig(
+#     load_in_4bit=True,
+#     bnb_4bit_compute_dtype=torch.float16,
+#     bnb_4bit_quant_type="nf4",
+#     bnb_4bit_use_double_quant=True
+# )
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2", use_fast = True)
 tokenizer.pad_token = tokenizer.eos_token
@@ -21,14 +22,14 @@ load_data = get_data( tokenizer = tokenizer )
 dataset = load_data()
 
 model = AutoModelForCausalLM.from_pretrained(
-    "gpt2",
-    quantization_config=quantization_config
+    "gpt2"
+    # quantization_config=quantization_config
 
     )
-ref_model = AutoModelForCausalLM.from_pretrained(
-    'gpt2-medium',
-    quantization_config=quantization_config
-    )
+# ref_model = AutoModelForCausalLM.from_pretrained(
+#     'gpt2-medium'
+#     # quantization_config=quantization_config
+#     )
 def compute_score(
         model_input : dict ,
         model_name = None ,
@@ -62,17 +63,18 @@ def compute_score(
     if for_each_token :
         return torch.tensor(seq_scores)
     scores = torch.mean(torch.stack(seq_scores, dim = -1),-1).to(torch.float32)
-    min = scores.min(dim = -1,keepdim = True).values
-    max = scores.max(dim = -1,keepdim = True).values
 
     if return_normalized:
+        min = scores.min(dim = -1,keepdim = True).values
+        max = scores.max(dim = -1,keepdim = True).values
+
         scores = (scores - min)/ (max  - min)
     return scores
 
 #print(compute_score(model_input=dataset, model_name='gpt2'))
 
 class rpo_loss_func:
-    def __init__( self, ref_model= ref_model, policy_model = model , beta = 0.3, distance_matrix= None ,reward_scaling = 0.3 ):
+    def __init__( self, ref_model= model, policy_model = model , beta = 0.3, distance_matrix= None ,reward_scaling = 0.3 ):
         self.ref_model = ref_model
         self.policy_model = policy_model
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -88,6 +90,9 @@ class rpo_loss_func:
         '''
 
         reward_k_response = reward_k_response.to(self.device)
+        print(f'reward_k_response : {reward_k_response}')
+        print(f'reward_scaling ; {self.reward_scaling}')
+
         raw_reward_prob = self.reward_scaling * reward_k_response
 
         raw_policy_likelihood = compute_score(
@@ -108,13 +113,17 @@ class rpo_loss_func:
         return torch.sum( loss)
 
 
-loss_func = rpo_loss_func()
-z = torch.tensor([
-        [0.423,0.234,0.2342,0.234],
-        [0.234,0.2342,0.2342,0.23412],
-        [0.2342,0.634,0.23426,0.634]
-    ])
+reward_model = Reward_Model( model = pre_model, model_output_shape = pre_model.config.vocab_size ).to('cuda')
+iter_dataset = iter(dataset)
+next_dataset = next(iter_dataset)
+result  = reward_model(next_dataset, for_eval  = True)
+B,S,V = result.shape
+reward_score = result.reshape(B,S*V) 
 
-loss_func.backward_kl( dataset , z)
+loss_func = rpo_loss_func()
+loss_func.backward_kl( dataset , reward_score)
+
 # ''' for backward '''
 # loss.backward()
+
+
