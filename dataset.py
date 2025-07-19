@@ -54,10 +54,10 @@ class get_data:
         dataset = DataLoader(dataset, batch_size = len(dataset))
         return dataset
 
-from transformers import  AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained('gpt2')
+# from transformers import  AutoTokenizer
+# tokenizer = AutoTokenizer.from_pretrained('gpt2')
 
-tokenizer.pad_token = tokenizer.eos_token
-data = get_data(tokenizer = tokenizer)
-dataset= data()
+# tokenizer.pad_token = tokenizer.eos_token
+# data = get_data(tokenizer = tokenizer)
+# dataset= data()
 

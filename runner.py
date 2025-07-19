@@ -2,18 +2,19 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.quantization_config import BitsAndBytesConfig
 from tqdm import tqdm
-# from Reward_Model import Reward_Model
-# from dataset import get_data
+from typing import Union 
+from Reward_Model import Reward_Model
+from dataset import get_data
 import numpy as np
 import math
 
 
-# quantization_config = BitsAndBytesConfig(
-#     load_in_4bit=True,
-#     bnb_4bit_compute_dtype=torch.float16,
-#     bnb_4bit_quant_type="nf4",
-#     bnb_4bit_use_double_quant=True
-# )
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True
+)
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2", use_fast = True)
 tokenizer.pad_token = tokenizer.eos_token
@@ -22,10 +23,10 @@ load_data = get_data( tokenizer = tokenizer )
 dataset = load_data()
 
 model = AutoModelForCausalLM.from_pretrained(
-    "gpt2"
-    # quantization_config=quantization_config
-
+    "gpt2",
+    quantization_config=quantization_config
     )
+
 # ref_model = AutoModelForCausalLM.from_pretrained(
 #     'gpt2-medium'
 #     # quantization_config=quantization_config
@@ -40,11 +41,13 @@ def compute_score(
 
     from transformers import AutoModelForCausalLM
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if model is None :
         model = AutoModelForCausalLM.from_pretrained( model_name )
+    else:
+        if model.device != 'cuda':
+            if torch.cuda.is_available():
+                model = model.to('cuda') 
 
-    model = model.to(device)
     model_input = next(iter(model_input))
     with torch.no_grad():
         output = model( **model_input )
@@ -52,7 +55,7 @@ def compute_score(
     '''
     logits --> ( Batch , SeqLen , Vocab_size )
     log_softmax ----> ( Batch, SeqLen , Vocab_size )
-    but diff for (1:4) (prompt:responses)
+    but diff for (1:2) (prompt:responses)
     '''
 
     log_softmax = -torch.nn.functional.log_softmax(logits, dim = -1 )
@@ -74,24 +77,36 @@ def compute_score(
 #print(compute_score(model_input=dataset, model_name='gpt2'))
 
 class rpo_loss_func:
-    def __init__( self, ref_model= model, policy_model = model , beta = 0.3, distance_matrix= None ,reward_scaling = 0.3 ):
+    def __init__( 
+            self, 
+            ref_model : nn.Module = model,
+            policy_model : nn.Module = model ,
+            beta : Union[int,float ] = 0.3,
+            distance_matrix= None ,
+            reward_scaling = 0.3 
+        ):
+        
         self.ref_model = ref_model
         self.policy_model = policy_model
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.beta = torch.tensor( beta, device = self.device )
+        self.beta = beta
         self.D = distance_matrix
-
-        self.reward_scaling = torch.tensor(reward_scaling,device = self.device)
+        self.reward_scaling = reward_scaling
 
     def backward_kl( self,dataset, reward_k_response):
-        '''
-        first we are need to compute π(yk∣x) likehood of the model to generate a prompt
-        that is done by computing the sum of all the token probability that have in respone
-        '''
 
-        reward_k_response = reward_k_response.to(self.device)
-        print(f'reward_k_response : {reward_k_response}')
-        print(f'reward_scaling ; {self.reward_scaling}')
+        if self.device != 'cuda':
+            if torch.cuda.is_available():
+                if self.ref_model.device != 'cuda':
+                    self.ref_model = self.ref_model.to('cuda')
+                if self.policy_model.device != 'cuda':
+                    self.policy_model = self.policy_model.to('cuda') 
+                if not isinstance(self.beta, torch.Tensor):
+                    self.beta = torch.tensor(self.beta, device = 'cuda')
+                if not isinstance(self.reward_scaling, torch.Tensor):
+                    self.reward_scaling = torch.tensor(self.reward_scaling, device = 'cuda')
+                if not isinstance( reward_k_response, torch.Tensor):
+                    reward_k_response = reward_k_response.to(self.device)
 
         raw_reward_prob = self.reward_scaling * reward_k_response
 
@@ -108,7 +123,7 @@ class rpo_loss_func:
         model_reward_prob = torch.nn.functional.softmax( raw_models_prob, dim = -1 )
         reward_model_prob = torch.nn.functional.softmax( raw_reward_prob, dim = -1 )
 
-
+        # here we are doing (backward (reverse ) kl divergence)  
         loss = reward_model_prob * torch.log( reward_model_prob / model_reward_prob )
         return torch.sum( loss)
 
@@ -121,8 +136,8 @@ B,S,V = result.shape
 reward_score = result.reshape(B,S*V) 
 
 loss_func = rpo_loss_func()
-loss_func.backward_kl( dataset , reward_score)
-
+loss = loss_func.backward_kl( dataset , reward_score)
+print(loss is : -- {loss}) 
 # ''' for backward '''
 # loss.backward()
 
